@@ -23,7 +23,10 @@ except Exception:
 
 # ---------- helper functions ----------
 def classic_polygons(rgb, min_area_px=40):
-    gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
+    if rgb.ndim == 2:
+        gray = rgb
+    else:
+        gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
     gray = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX)
     block = max(31, (min(gray.shape) // 20) | 1)
     th = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -150,8 +153,13 @@ else:
             W, H = src.width // scale, src.height // scale
             data = src.read(out_shape=(src.count, H, W))
             arr = data[:3] if src.count >= 3 else np.repeat(data[:1], 3, axis=0)
+            if arr.shape[0] > 3:
+                arr = arr[:3]
+            if arr.shape[0] < 3:
+                arr = np.repeat(arr[:1], 3, axis=0)
             lo, hi = np.percentile(arr, [2, 98])
-            rgb = np.clip((arr.astype("float32") - lo) / max(hi - lo, 1) * 255, 0, 255).astype("uint8")
+            arr = np.clip((arr.astype("float32") - lo) / max(hi - lo, 1) * 255, 0, 255).astype("uint8")
+            rgb = np.transpose(arr, (1, 2, 0))   # rasterio (bands,H,W) → OpenCV (H,W,bands)
             transform = src.transform * src.transform.scale(scale, scale)
             crs = src.crs
             georef = crs is not None
@@ -198,10 +206,7 @@ else:
                             else:
                                 recs = [Polygon(pts.astype(float) * gsd) for pts in polys]
                                 raw = gpd.GeoDataFrame(geometry=recs)
-                        if raw.crs is None:
-                            raw["area_m2"] = raw.geometry.area
-                        else:
-                            raw["area_m2"] = raw.geometry.area
+                        raw["area_m2"] = raw.geometry.area
                         b, p, flags = build_outputs(raw)
                         st.session_state["res"] = (b, p, flags, georef, rgb, gsd)
                     except Exception as e:
