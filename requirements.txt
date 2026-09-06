@@ -2,3 +2,9 @@ streamlit
 streamlit-folium
 folium
 geopandas
+rasterio
+opencv-python-headless
+pillow
+numpy
+pandas
+shapely
